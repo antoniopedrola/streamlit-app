@@ -39,7 +39,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("👥 Synthetic User Research Assistant")
-st.caption("v2.4 - Simplified Evidence Display")
+st.caption("v2.5 - Persistent Debug Info")
 
 # Add database setup instructions
 with st.expander("⚙️ DATABASE SETUP REQUIRED", expanded=False):
@@ -279,22 +279,24 @@ def load_personas():
 def search_evidence(query: str, market: str, limit: int = 5):
     query_embedding = embeddings.embed_query(query)
     
+    debug_info = []
+    
     # DEBUG - Check if we have evidence at all
     try:
         check_result = supabase.table("research_evidence").select("id, market, source_type, embedding").eq("market", market).limit(3).execute()
-        st.write(f"🔍 DEBUG: Database check for market '{market}':")
+        debug_info.append(f"🔍 DEBUG: Database check for market '{market}':")
         if check_result.data:
-            st.write(f"   - Found {len(check_result.data)} evidence items in database")
+            debug_info.append(f"   - Found {len(check_result.data)} evidence items in database")
             for item in check_result.data:
                 has_embedding = item.get('embedding') is not None
-                st.write(f"   - {item.get('source_type')}: Embedding = {'✅ Yes' if has_embedding else '❌ MISSING'}")
+                debug_info.append(f"   - {item.get('source_type')}: Embedding = {'✅ Yes' if has_embedding else '❌ MISSING'}")
         else:
-            st.error(f"   - ❌ No evidence found in database for market '{market}'")
+            debug_info.append(f"   - ❌ No evidence found in database for market '{market}'")
     except Exception as e:
-        st.error(f"   - Error checking database: {str(e)}")
+        debug_info.append(f"   - Error checking database: {str(e)}")
     
     # Now try the search
-    st.write(f"🔍 DEBUG: Searching with vector similarity (threshold=0.65)...")
+    debug_info.append(f"🔍 DEBUG: Searching with vector similarity (threshold=0.65)...")
     
     try:
         result = supabase.rpc(
@@ -308,15 +310,15 @@ def search_evidence(query: str, market: str, limit: int = 5):
         ).execute()
         
         if result.data:
-            st.success(f"   - ✅ Vector search found {len(result.data)} matching items")
+            debug_info.append(f"   - ✅ Vector search found {len(result.data)} matching items")
         else:
-            st.warning(f"   - ⚠️ Vector search returned 0 results (embeddings might be missing or no matches above threshold)")
+            debug_info.append(f"   - ⚠️ Vector search returned 0 results (embeddings might be missing or no matches above threshold)")
         
-        return result.data if result.data else []
+        return result.data if result.data else [], debug_info
     except Exception as e:
-        st.error(f"   - ❌ Search function error: {str(e)}")
-        st.info("   - This usually means the search_evidence function doesn't exist or has wrong parameters")
-        return []
+        debug_info.append(f"   - ❌ Search function error: {str(e)}")
+        debug_info.append("   - This usually means the search_evidence function doesn't exist or has wrong parameters")
+        return [], debug_info
 
 def generate_synthetic_response(persona, question, evidence_data, conversation_history):
     """Generate response using full conversation context and evidence"""
@@ -445,6 +447,12 @@ try:
                 st.write(item['question'])
             
             with st.chat_message("assistant", avatar="👤"):
+                # Show DEBUG info FIRST (persistent)
+                if item.get('debug_info'):
+                    with st.expander("🔍 Debug Info (Click to collapse)", expanded=True):
+                        for debug_line in item['debug_info']:
+                            st.text(debug_line)
+                
                 # Show evidence source COUNTS at TOP
                 if item.get('evidence'):
                     display_evidence_sources(item['evidence'], persona['market'])
@@ -473,54 +481,66 @@ try:
             
             with st.chat_message("assistant", avatar="👤"):
                 with st.spinner("Thinking..."):
+                    all_debug_info = []
+                    
                     # Get evidence from persona's market and global
-                    local_evidence = search_evidence(question, persona['market'], limit=5)
-                    global_evidence = search_evidence(question, 'global', limit=2)
+                    local_evidence, local_debug = search_evidence(question, persona['market'], limit=5)
+                    all_debug_info.extend(local_debug)
+                    
+                    global_evidence, global_debug = search_evidence(question, 'global', limit=2)
+                    all_debug_info.extend(global_debug)
+                    
                     all_evidence = local_evidence + global_evidence
                     
                     # FALLBACK: If no evidence found via vector search, get ANY evidence from market
                     if not all_evidence:
-                        st.warning("⚠️ Vector search found nothing. Trying fallback: getting random evidence...")
+                        all_debug_info.append("⚠️ Vector search found nothing. Trying fallback: getting random evidence...")
                         try:
                             fallback = supabase.table("research_evidence").select("*").eq("market", persona['market']).limit(3).execute()
                             if fallback.data:
-                                st.info(f"✅ Fallback found {len(fallback.data)} items (not semantically matched)")
+                                all_debug_info.append(f"✅ Fallback found {len(fallback.data)} items (not semantically matched)")
                                 all_evidence = fallback.data
                             else:
-                                st.error("❌ Even fallback found nothing - database might be empty")
+                                all_debug_info.append("❌ Even fallback found nothing - database might be empty")
                         except Exception as e:
-                            st.error(f"❌ Fallback error: {str(e)}")
-                    
-                    # Show evidence source COUNTS at TOP
-                    if all_evidence:
-                        display_evidence_sources(all_evidence, persona['market'])
-                        st.markdown("---")
-                    
-                    # Generate response with full conversation context
-                    answer = generate_synthetic_response(
-                        persona, 
-                        question, 
-                        all_evidence,
-                        st.session_state.conversation  # Pass full conversation history
-                    )
-                    st.write(answer)
-                    
-                    # Show detailed evidence quotes (expandable)
-                    if all_evidence:
-                        with st.expander(f"📊 View {len(all_evidence)} evidence quotes", expanded=False):
-                            for ev in all_evidence:
-                                badge_text = get_evidence_badge(ev['source_type'])
-                                st.markdown(f"**{badge_text}** • {ev['market'].upper()}")
-                                st.info(f'"{ev["content"]}"')
-                                if ev.get('metadata'):
-                                    st.caption(f"Metadata: {ev['metadata']}")
-                                st.markdown("")
+                            all_debug_info.append(f"❌ Fallback error: {str(e)}")
+                
+                # Display debug info (will persist after rerun)
+                with st.expander("🔍 Debug Info (Click to collapse)", expanded=True):
+                    for debug_line in all_debug_info:
+                        st.text(debug_line)
+                
+                # Show evidence source COUNTS at TOP
+                if all_evidence:
+                    display_evidence_sources(all_evidence, persona['market'])
+                    st.markdown("---")
+                
+                # Generate response with full conversation context
+                answer = generate_synthetic_response(
+                    persona, 
+                    question, 
+                    all_evidence,
+                    st.session_state.conversation  # Pass full conversation history
+                )
+                st.write(answer)
+                
+                # Show detailed evidence quotes (expandable)
+                if all_evidence:
+                    with st.expander(f"📊 View {len(all_evidence)} evidence quotes", expanded=False):
+                        for ev in all_evidence:
+                            badge_text = get_evidence_badge(ev['source_type'])
+                            st.markdown(f"**{badge_text}** • {ev['market'].upper()}")
+                            st.info(f'"{ev["content"]}"')
+                            if ev.get('metadata'):
+                                st.caption(f"Metadata: {ev['metadata']}")
+                            st.markdown("")
             
-            # Save to conversation history
+            # Save to conversation history WITH debug info
             st.session_state.conversation.append({
                 'question': question,
                 'answer': answer,
-                'evidence': all_evidence
+                'evidence': all_evidence,
+                'debug_info': all_debug_info  # Save debug info!
             })
             st.rerun()
 
