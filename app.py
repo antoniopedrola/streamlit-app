@@ -39,6 +39,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("👥 Synthetic User Research Assistant")
+st.caption("v2.1 - Evidence Counts Display")
 st.markdown("### Setup Required")
 
 # Check if packages are installed
@@ -445,3 +446,4 @@ except Exception as e:
 
 st.markdown("---")
 st.caption("Powered by Claude + Supabase • Synthetic User Research")
+# Force update - Wed Jan 28 20:40:37 UTC 2026
