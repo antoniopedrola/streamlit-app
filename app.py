@@ -39,7 +39,49 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("👥 Synthetic User Research Assistant")
-st.caption("v2.1 - Evidence Counts Display")
+st.caption("v2.3 - DEBUG MODE: Enhanced Diagnostics + Fallback")
+
+# Add database setup instructions
+with st.expander("⚙️ DATABASE SETUP REQUIRED", expanded=False):
+    st.markdown("""
+    ### 📋 Step 1: Set Up Supabase Database
+    
+    If you haven't set up your database yet, you need to:
+    
+    1. **Download the database setup file**: 
+       - [database_setup.sql](https://github.com/antoniopedrola/streamlit-app/blob/main/database_setup.sql)
+       - Or find it in your project files
+    
+    2. **Go to your Supabase project**: https://supabase.com
+    
+    3. **Open SQL Editor** (in the left sidebar)
+    
+    4. **Copy and paste the ENTIRE `database_setup.sql` file**
+    
+    5. **Click "Run"** (or press Ctrl+Enter)
+    
+    6. **Verify it worked**: You should see "Success. No rows returned"
+    
+    This creates:
+    - ✅ Personas table (6 sample personas)
+    - ✅ Research evidence table (18+ sample evidence items WITH embeddings)
+    - ✅ Vector search function
+    - ✅ All necessary indexes
+    
+    ### 🔍 Check if Database is Set Up
+    
+    If you've already run the SQL, you can verify by checking in Supabase:
+    - Go to **Table Editor** → Look for `personas` and `research_evidence` tables
+    - `personas` should have 6 rows
+    - `research_evidence` should have 18+ rows
+    
+    ### ❌ Common Issues
+    
+    - **"No evidence found"** → Database not set up or empty
+    - **"Function search_evidence does not exist"** → SQL wasn't run completely
+    - **"No rows in research_evidence"** → Evidence wasn't inserted
+    """)
+
 st.markdown("### Setup Required")
 
 # Check if packages are installed
@@ -190,7 +232,12 @@ def get_evidence_badge(source_type):
 
 def display_evidence_sources(evidence_list, market=None):
     """Display evidence source counts by type"""
+    
+    # DEBUG: Show what we received
+    st.write(f"DEBUG: Received {len(evidence_list) if evidence_list else 0} evidence items")
+    
     if not evidence_list:
+        st.warning("⚠️ No evidence found for this query")
         return
     
     st.markdown("**📚 Sources used for this answer:**")
@@ -203,6 +250,9 @@ def display_evidence_sources(evidence_list, market=None):
             type_counts[source_type] = 0
         type_counts[source_type] += 1
     
+    # DEBUG: Show what we counted
+    st.write(f"DEBUG: Found {len(type_counts)} different source types: {list(type_counts.keys())}")
+    
     # Display counts in columns
     badge_map = {
         'interview_transcript': '🎤 Interview',
@@ -213,11 +263,14 @@ def display_evidence_sources(evidence_list, market=None):
     }
     
     # Create columns for each source type found
-    cols = st.columns(len(type_counts))
-    for idx, (source_type, count) in enumerate(type_counts.items()):
-        with cols[idx]:
-            badge = badge_map.get(source_type, f'📄 {source_type}')
-            st.metric(label=badge, value=count)
+    if type_counts:
+        cols = st.columns(len(type_counts))
+        for idx, (source_type, count) in enumerate(type_counts.items()):
+            with cols[idx]:
+                badge = badge_map.get(source_type, f'📄 {source_type}')
+                st.metric(label=badge, value=count)
+    else:
+        st.error("No evidence types found!")
 
 # Load personas
 def load_personas():
@@ -227,17 +280,44 @@ def load_personas():
 def search_evidence(query: str, market: str, limit: int = 5):
     query_embedding = embeddings.embed_query(query)
     
-    result = supabase.rpc(
-        "search_evidence",
-        {
-            "query_embedding": query_embedding,
-            "market_filter": market,
-            "match_threshold": 0.65,
-            "match_count": limit
-        }
-    ).execute()
+    # DEBUG - Check if we have evidence at all
+    try:
+        check_result = supabase.table("research_evidence").select("id, market, source_type, embedding").eq("market", market).limit(3).execute()
+        st.write(f"🔍 DEBUG: Database check for market '{market}':")
+        if check_result.data:
+            st.write(f"   - Found {len(check_result.data)} evidence items in database")
+            for item in check_result.data:
+                has_embedding = item.get('embedding') is not None
+                st.write(f"   - {item.get('source_type')}: Embedding = {'✅ Yes' if has_embedding else '❌ MISSING'}")
+        else:
+            st.error(f"   - ❌ No evidence found in database for market '{market}'")
+    except Exception as e:
+        st.error(f"   - Error checking database: {str(e)}")
     
-    return result.data if result.data else []
+    # Now try the search
+    st.write(f"🔍 DEBUG: Searching with vector similarity (threshold=0.65)...")
+    
+    try:
+        result = supabase.rpc(
+            "search_evidence",
+            {
+                "query_embedding": query_embedding,
+                "market_filter": market,
+                "match_threshold": 0.65,
+                "match_count": limit
+            }
+        ).execute()
+        
+        if result.data:
+            st.success(f"   - ✅ Vector search found {len(result.data)} matching items")
+        else:
+            st.warning(f"   - ⚠️ Vector search returned 0 results (embeddings might be missing or no matches above threshold)")
+        
+        return result.data if result.data else []
+    except Exception as e:
+        st.error(f"   - ❌ Search function error: {str(e)}")
+        st.info("   - This usually means the search_evidence function doesn't exist or has wrong parameters")
+        return []
 
 def generate_synthetic_response(persona, question, evidence_data, conversation_history):
     """Generate response using full conversation context and evidence"""
@@ -398,6 +478,19 @@ try:
                     local_evidence = search_evidence(question, persona['market'], limit=5)
                     global_evidence = search_evidence(question, 'global', limit=2)
                     all_evidence = local_evidence + global_evidence
+                    
+                    # FALLBACK: If no evidence found via vector search, get ANY evidence from market
+                    if not all_evidence:
+                        st.warning("⚠️ Vector search found nothing. Trying fallback: getting random evidence...")
+                        try:
+                            fallback = supabase.table("research_evidence").select("*").eq("market", persona['market']).limit(3).execute()
+                            if fallback.data:
+                                st.info(f"✅ Fallback found {len(fallback.data)} items (not semantically matched)")
+                                all_evidence = fallback.data
+                            else:
+                                st.error("❌ Even fallback found nothing - database might be empty")
+                        except Exception as e:
+                            st.error(f"❌ Fallback error: {str(e)}")
                     
                     # Show evidence source COUNTS at TOP
                     if all_evidence:
