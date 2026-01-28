@@ -188,34 +188,35 @@ def get_evidence_badge(source_type):
     return badge_map.get(source_type, f'📄 {source_type}')
 
 def display_evidence_sources(evidence_list, market=None):
-    """Display evidence sources at top of response with actual content"""
+    """Display evidence source counts by type"""
     if not evidence_list:
         return
     
-    # Show market context
-    if market:
-        st.markdown(f"**📚 Sources from {market.upper()} market:**")
-    else:
-        st.markdown("**📚 Sources used for this answer:**")
+    st.markdown("**📚 Sources used for this answer:**")
     
-    st.markdown("")
-    
-    # Display each evidence item with content
+    # Count evidence by type
+    type_counts = {}
     for ev in evidence_list:
-        badge_text = get_evidence_badge(ev['source_type'])
-        market_text = ev['market'].upper()
-        content = ev['content']
-        
-        # Truncate long content for preview
-        preview = content[:200] + "..." if len(content) > 200 else content
-        
-        # Create columns for badge and content
-        col1, col2 = st.columns([1, 5])
-        with col1:
-            st.markdown(f"**{badge_text}**")
-            st.caption(market_text)
-        with col2:
-            st.info(f'"{preview}"')
+        source_type = ev['source_type']
+        if source_type not in type_counts:
+            type_counts[source_type] = 0
+        type_counts[source_type] += 1
+    
+    # Display counts in columns
+    badge_map = {
+        'interview_transcript': '🎤 Interview',
+        'social_listening': '💬 Social',
+        'search_query': '🔍 Search',
+        'user_quote': '💭 Quote',
+        'behavioral_data': '📊 Analytics'
+    }
+    
+    # Create columns for each source type found
+    cols = st.columns(len(type_counts))
+    for idx, (source_type, count) in enumerate(type_counts.items()):
+        with cols[idx]:
+            badge = badge_map.get(source_type, f'📄 {source_type}')
+            st.metric(label=badge, value=count)
 
 # Load personas
 def load_personas():
@@ -364,13 +365,24 @@ try:
                 st.write(item['question'])
             
             with st.chat_message("assistant", avatar="👤"):
-                # Show evidence sources at TOP with content
+                # Show evidence source COUNTS at TOP
                 if item.get('evidence'):
                     display_evidence_sources(item['evidence'], persona['market'])
                     st.markdown("---")
                 
                 # Show answer
                 st.write(item['answer'])
+                
+                # Show detailed evidence quotes (expandable)
+                if item.get('evidence'):
+                    with st.expander(f"📊 View {len(item['evidence'])} evidence quotes", expanded=False):
+                        for ev in item['evidence']:
+                            badge_text = get_evidence_badge(ev['source_type'])
+                            st.markdown(f"**{badge_text}** • {ev['market'].upper()}")
+                            st.info(f'"{ev["content"]}"')
+                            if ev.get('metadata'):
+                                st.caption(f"Metadata: {ev['metadata']}")
+                            st.markdown("")
         
         # Chat input
         question = st.chat_input("Ask a question...")
@@ -386,7 +398,7 @@ try:
                     global_evidence = search_evidence(question, 'global', limit=2)
                     all_evidence = local_evidence + global_evidence
                     
-                    # Show evidence sources at TOP with content
+                    # Show evidence source COUNTS at TOP
                     if all_evidence:
                         display_evidence_sources(all_evidence, persona['market'])
                         st.markdown("---")
@@ -399,6 +411,17 @@ try:
                         st.session_state.conversation  # Pass full conversation history
                     )
                     st.write(answer)
+                    
+                    # Show detailed evidence quotes (expandable)
+                    if all_evidence:
+                        with st.expander(f"📊 View {len(all_evidence)} evidence quotes", expanded=False):
+                            for ev in all_evidence:
+                                badge_text = get_evidence_badge(ev['source_type'])
+                                st.markdown(f"**{badge_text}** • {ev['market'].upper()}")
+                                st.info(f'"{ev["content"]}"')
+                                if ev.get('metadata'):
+                                    st.caption(f"Metadata: {ev['metadata']}")
+                                st.markdown("")
             
             # Save to conversation history
             st.session_state.conversation.append({
