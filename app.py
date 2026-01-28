@@ -175,37 +175,47 @@ with st.spinner("Loading AI models..."):
 
 st.success("✅ App fully initialized and ready!")
 
-# Helper function to get evidence badge HTML
+# Helper function to get evidence badge emoji
 def get_evidence_badge(source_type):
-    """Return HTML badge for evidence type"""
+    """Return emoji badge for evidence type"""
     badge_map = {
-        'interview_transcript': ('interview', '🎤 Interview'),
-        'social_listening': ('social', '💬 Social Media'),
-        'search_query': ('search', '🔍 Search Query'),
-        'user_quote': ('quote', '💭 User Quote'),
-        'behavioral_data': ('behavioral', '📊 Analytics')
+        'interview_transcript': '🎤 Interview',
+        'social_listening': '💬 Social',
+        'search_query': '🔍 Search',
+        'user_quote': '💭 Quote',
+        'behavioral_data': '📊 Analytics'
     }
-    
-    css_class, label = badge_map.get(source_type, ('quote', source_type))
-    return f'<span class="evidence-badge {css_class}">{label}</span>'
+    return badge_map.get(source_type, f'📄 {source_type}')
 
-def format_evidence_preview(evidence_list):
-    """Format evidence sources for display at top of response"""
+def display_evidence_sources(evidence_list, market=None):
+    """Display evidence sources at top of response with actual content"""
     if not evidence_list:
-        return ""
+        return
     
-    html_parts = ["<div style='margin: 10px 0;'>"]
-    html_parts.append("<strong>📚 Sources used for this answer:</strong><br/>")
+    # Show market context
+    if market:
+        st.markdown(f"**📚 Sources from {market.upper()} market:**")
+    else:
+        st.markdown("**📚 Sources used for this answer:**")
     
+    st.markdown("")
+    
+    # Display each evidence item with content
     for ev in evidence_list:
-        badge = get_evidence_badge(ev['source_type'])
-        market = ev['market'].upper()
-        preview = ev['content'][:80] + "..." if len(ev['content']) > 80 else ev['content']
+        badge_text = get_evidence_badge(ev['source_type'])
+        market_text = ev['market'].upper()
+        content = ev['content']
         
-        html_parts.append(f"{badge} <span style='color: #666; font-size: 12px;'>[{market}]</span>")
-    
-    html_parts.append("</div>")
-    return "".join(html_parts)
+        # Truncate long content for preview
+        preview = content[:200] + "..." if len(content) > 200 else content
+        
+        # Create columns for badge and content
+        col1, col2 = st.columns([1, 5])
+        with col1:
+            st.markdown(f"**{badge_text}**")
+            st.caption(market_text)
+        with col2:
+            st.info(f'"{preview}"')
 
 # Load personas
 def load_personas():
@@ -245,7 +255,7 @@ def generate_synthetic_response(persona, question, evidence_data, conversation_h
             history_text += f"User asked: {item['question']}\n"
             history_text += f"You responded: {item['answer']}\n\n"
     
-    system_prompt = f"""You are {persona['name']}, a {persona['age']}-year-old {persona['occupation']} from {persona['market']}.
+    system_prompt = f"""You are {persona['name']}, a {persona['age']}-year-old {persona['occupation']} from {persona['market'].upper()}.
 
 Your background: {persona['bio']}
 Your pain points: {', '.join(persona.get('pain_points', []))}
@@ -254,16 +264,16 @@ Your goals: {', '.join(persona.get('goals', []))}
 IMPORTANT INSTRUCTIONS:
 1. Answer questions AS THIS PERSON in first person
 2. Be authentic and conversational (2-4 sentences)
-3. Use the evidence below to inform your answer
+3. Use ONLY the evidence from {persona['market'].upper()} below - this is real data from your market
 4. Remember the conversation history - build on previous answers
 5. Stay consistent with what you've said before
-6. Speak naturally as this persona would
+6. Speak naturally as this persona would, reflecting your market's culture
 
-Evidence from research:
+Evidence from {persona['market'].upper()} research:
 {evidence_text}
 {history_text}
 
-Now answer the current question naturally, considering both the evidence and our conversation so far."""
+Now answer the current question naturally as a person from {persona['market'].upper()}, using the evidence from your market."""
 
     # Build message history for LLM
     messages = [SystemMessage(content=system_prompt)]
@@ -354,25 +364,13 @@ try:
                 st.write(item['question'])
             
             with st.chat_message("assistant", avatar="👤"):
-                # Show evidence sources at TOP
+                # Show evidence sources at TOP with content
                 if item.get('evidence'):
-                    evidence_html = format_evidence_preview(item['evidence'])
-                    st.markdown(evidence_html, unsafe_allow_html=True)
+                    display_evidence_sources(item['evidence'], persona['market'])
                     st.markdown("---")
                 
                 # Show answer
                 st.write(item['answer'])
-                
-                # Show detailed evidence at bottom (expandable)
-                if item.get('evidence'):
-                    with st.expander("📊 View detailed evidence", expanded=False):
-                        for ev in item['evidence']:
-                            badge = get_evidence_badge(ev['source_type'])
-                            st.markdown(f"{badge} **{ev['market'].upper()}**", unsafe_allow_html=True)
-                            st.markdown(f'<div class="evidence-preview">"{ev["content"]}"</div>', unsafe_allow_html=True)
-                            if ev.get('metadata'):
-                                st.caption(f"Metadata: {ev['metadata']}")
-                            st.markdown("")
         
         # Chat input
         question = st.chat_input("Ask a question...")
@@ -383,15 +381,14 @@ try:
             
             with st.chat_message("assistant", avatar="👤"):
                 with st.spinner("Thinking..."):
-                    # Get evidence
-                    local_evidence = search_evidence(question, persona['market'], limit=4)
+                    # Get evidence from persona's market and global
+                    local_evidence = search_evidence(question, persona['market'], limit=5)
                     global_evidence = search_evidence(question, 'global', limit=2)
                     all_evidence = local_evidence + global_evidence
                     
-                    # Show evidence sources at TOP
+                    # Show evidence sources at TOP with content
                     if all_evidence:
-                        evidence_html = format_evidence_preview(all_evidence)
-                        st.markdown(evidence_html, unsafe_allow_html=True)
+                        display_evidence_sources(all_evidence, persona['market'])
                         st.markdown("---")
                     
                     # Generate response with full conversation context
@@ -402,17 +399,6 @@ try:
                         st.session_state.conversation  # Pass full conversation history
                     )
                     st.write(answer)
-                    
-                    # Show detailed evidence (expandable)
-                    if all_evidence:
-                        with st.expander("📊 View detailed evidence", expanded=False):
-                            for ev in all_evidence:
-                                badge = get_evidence_badge(ev['source_type'])
-                                st.markdown(f"{badge} **{ev['market'].upper()}**", unsafe_allow_html=True)
-                                st.markdown(f'<div class="evidence-preview">"{ev["content"]}"</div>', unsafe_allow_html=True)
-                                if ev.get('metadata'):
-                                    st.caption(f"Metadata: {ev['metadata']}")
-                                st.markdown("")
             
             # Save to conversation history
             st.session_state.conversation.append({
