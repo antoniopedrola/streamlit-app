@@ -9,6 +9,35 @@ st.set_page_config(
     layout="wide"
 )
 
+# Custom CSS for better evidence display
+st.markdown("""
+<style>
+    .evidence-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        margin: 4px;
+        border-radius: 12px;
+        font-size: 11px;
+        font-weight: 600;
+        color: white;
+    }
+    .interview { background-color: #2196F3; }
+    .social { background-color: #FF9800; }
+    .search { background-color: #4CAF50; }
+    .quote { background-color: #9C27B0; }
+    .behavioral { background-color: #607D8B; }
+    .evidence-preview {
+        background-color: #f5f5f5;
+        border-left: 3px solid #2196F3;
+        padding: 8px 12px;
+        margin: 8px 0;
+        font-size: 13px;
+        font-style: italic;
+        border-radius: 4px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 st.title("👥 Synthetic User Research Assistant")
 st.markdown("### Setup Required")
 
@@ -60,14 +89,14 @@ if not all_installed:
     """)
     
     st.code("""
-streamlit==1.31.0
-supabase==2.3.4
-langchain==0.1.7
-langchain-anthropic==0.1.6
-langchain-community==0.0.20
-sentence-transformers==2.3.1
-anthropic==0.18.1
-python-dotenv==1.0.0
+streamlit>=1.31.0
+supabase>=2.3.0
+langchain>=0.1.0
+langchain-anthropic>=0.1.0
+langchain-community>=0.0.20
+sentence-transformers>=2.2.0
+anthropic>=0.18.0
+python-dotenv>=1.0.0
     """)
     
     st.markdown("**packages.txt should contain:**")
@@ -85,7 +114,7 @@ st.success("### ✅ All Packages Installed Successfully!")
 from supabase import create_client
 from langchain_anthropic import ChatAnthropic
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
 
 # Initialize session state
 if "selected_persona" not in st.session_state:
@@ -146,6 +175,38 @@ with st.spinner("Loading AI models..."):
 
 st.success("✅ App fully initialized and ready!")
 
+# Helper function to get evidence badge HTML
+def get_evidence_badge(source_type):
+    """Return HTML badge for evidence type"""
+    badge_map = {
+        'interview_transcript': ('interview', '🎤 Interview'),
+        'social_listening': ('social', '💬 Social Media'),
+        'search_query': ('search', '🔍 Search Query'),
+        'user_quote': ('quote', '💭 User Quote'),
+        'behavioral_data': ('behavioral', '📊 Analytics')
+    }
+    
+    css_class, label = badge_map.get(source_type, ('quote', source_type))
+    return f'<span class="evidence-badge {css_class}">{label}</span>'
+
+def format_evidence_preview(evidence_list):
+    """Format evidence sources for display at top of response"""
+    if not evidence_list:
+        return ""
+    
+    html_parts = ["<div style='margin: 10px 0;'>"]
+    html_parts.append("<strong>📚 Sources used for this answer:</strong><br/>")
+    
+    for ev in evidence_list:
+        badge = get_evidence_badge(ev['source_type'])
+        market = ev['market'].upper()
+        preview = ev['content'][:80] + "..." if len(ev['content']) > 80 else ev['content']
+        
+        html_parts.append(f"{badge} <span style='color: #666; font-size: 12px;'>[{market}]</span>")
+    
+    html_parts.append("</div>")
+    return "".join(html_parts)
+
 # Load personas
 def load_personas():
     result = supabase.table("personas").select("*").execute()
@@ -166,12 +227,23 @@ def search_evidence(query: str, market: str, limit: int = 5):
     
     return result.data if result.data else []
 
-def generate_synthetic_response(persona, question, evidence_data):
+def generate_synthetic_response(persona, question, evidence_data, conversation_history):
+    """Generate response using full conversation context and evidence"""
+    
+    # Build evidence context
     evidence_context = []
     for item in evidence_data:
         evidence_context.append(f"Source: {item['source_type']} ({item['market']})\nContent: {item['content']}\n---")
     
     evidence_text = "\n".join(evidence_context) if evidence_context else "No specific evidence found."
+    
+    # Build conversation history summary
+    history_text = ""
+    if conversation_history:
+        history_text = "\n\nPrevious conversation context:\n"
+        for item in conversation_history[-6:]:  # Last 3 exchanges (6 messages)
+            history_text += f"User asked: {item['question']}\n"
+            history_text += f"You responded: {item['answer']}\n\n"
     
     system_prompt = f"""You are {persona['name']}, a {persona['age']}-year-old {persona['occupation']} from {persona['market']}.
 
@@ -179,16 +251,30 @@ Your background: {persona['bio']}
 Your pain points: {', '.join(persona.get('pain_points', []))}
 Your goals: {', '.join(persona.get('goals', []))}
 
-Answer questions AS THIS PERSON. Use first person. Be authentic and conversational (2-4 sentences).
-Base your answers on the evidence below when relevant, but speak naturally.
+IMPORTANT INSTRUCTIONS:
+1. Answer questions AS THIS PERSON in first person
+2. Be authentic and conversational (2-4 sentences)
+3. Use the evidence below to inform your answer
+4. Remember the conversation history - build on previous answers
+5. Stay consistent with what you've said before
+6. Speak naturally as this persona would
 
 Evidence from research:
-{evidence_text}"""
+{evidence_text}
+{history_text}
 
-    messages = [
-        SystemMessage(content=system_prompt),
-        HumanMessage(content=question)
-    ]
+Now answer the current question naturally, considering both the evidence and our conversation so far."""
+
+    # Build message history for LLM
+    messages = [SystemMessage(content=system_prompt)]
+    
+    # Add conversation history to maintain context
+    for item in conversation_history[-4:]:  # Last 2 exchanges
+        messages.append(HumanMessage(content=item['question']))
+        messages.append(AIMessage(content=item['answer']))
+    
+    # Add current question
+    messages.append(HumanMessage(content=question))
     
     return llm.invoke(messages).content
 
@@ -256,6 +342,10 @@ try:
             if persona.get('goals'):
                 st.write(f"**Goals:** {', '.join(persona['goals'])}")
         
+        # Show conversation context indicator
+        if st.session_state.conversation:
+            st.caption(f"📝 Conversation context: {len(st.session_state.conversation)} exchanges")
+        
         st.markdown("---")
         
         # Display conversation
@@ -264,16 +354,25 @@ try:
                 st.write(item['question'])
             
             with st.chat_message("assistant", avatar="👤"):
+                # Show evidence sources at TOP
+                if item.get('evidence'):
+                    evidence_html = format_evidence_preview(item['evidence'])
+                    st.markdown(evidence_html, unsafe_allow_html=True)
+                    st.markdown("---")
+                
+                # Show answer
                 st.write(item['answer'])
                 
+                # Show detailed evidence at bottom (expandable)
                 if item.get('evidence'):
-                    st.markdown("#### 📊 Real Evidence")
-                    
-                    for ev in item['evidence']:
-                        market_class = ev['market'].lower()
-                        st.markdown(f"**{ev['market'].upper()}** - {ev['source_type']}")
-                        st.info(f'"{ev["content"]}"')
-                        st.markdown("")
+                    with st.expander("📊 View detailed evidence", expanded=False):
+                        for ev in item['evidence']:
+                            badge = get_evidence_badge(ev['source_type'])
+                            st.markdown(f"{badge} **{ev['market'].upper()}**", unsafe_allow_html=True)
+                            st.markdown(f'<div class="evidence-preview">"{ev["content"]}"</div>', unsafe_allow_html=True)
+                            if ev.get('metadata'):
+                                st.caption(f"Metadata: {ev['metadata']}")
+                            st.markdown("")
         
         # Chat input
         question = st.chat_input("Ask a question...")
@@ -289,19 +388,33 @@ try:
                     global_evidence = search_evidence(question, 'global', limit=2)
                     all_evidence = local_evidence + global_evidence
                     
-                    # Generate response
-                    answer = generate_synthetic_response(persona, question, all_evidence)
+                    # Show evidence sources at TOP
+                    if all_evidence:
+                        evidence_html = format_evidence_preview(all_evidence)
+                        st.markdown(evidence_html, unsafe_allow_html=True)
+                        st.markdown("---")
+                    
+                    # Generate response with full conversation context
+                    answer = generate_synthetic_response(
+                        persona, 
+                        question, 
+                        all_evidence,
+                        st.session_state.conversation  # Pass full conversation history
+                    )
                     st.write(answer)
                     
-                    # Show evidence
+                    # Show detailed evidence (expandable)
                     if all_evidence:
-                        st.markdown("#### 📊 Real Evidence")
-                        
-                        for ev in all_evidence:
-                            st.markdown(f"**{ev['market'].upper()}** - {ev['source_type']}")
-                            st.info(f'"{ev["content"]}"')
-                            st.markdown("")
+                        with st.expander("📊 View detailed evidence", expanded=False):
+                            for ev in all_evidence:
+                                badge = get_evidence_badge(ev['source_type'])
+                                st.markdown(f"{badge} **{ev['market'].upper()}**", unsafe_allow_html=True)
+                                st.markdown(f'<div class="evidence-preview">"{ev["content"]}"</div>', unsafe_allow_html=True)
+                                if ev.get('metadata'):
+                                    st.caption(f"Metadata: {ev['metadata']}")
+                                st.markdown("")
             
+            # Save to conversation history
             st.session_state.conversation.append({
                 'question': question,
                 'answer': answer,
