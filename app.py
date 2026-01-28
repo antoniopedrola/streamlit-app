@@ -85,7 +85,7 @@ st.success("### ✅ All Packages Installed Successfully!")
 from supabase import create_client
 from langchain_anthropic import ChatAnthropic
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 # Initialize session state
 if "selected_persona" not in st.session_state:
