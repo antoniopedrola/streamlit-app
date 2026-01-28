@@ -39,7 +39,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("👥 Synthetic User Research Assistant")
-st.caption("v2.3 - DEBUG MODE: Enhanced Diagnostics + Fallback")
+st.caption("v2.4 - Simplified Evidence Display")
 
 # Add database setup instructions
 with st.expander("⚙️ DATABASE SETUP REQUIRED", expanded=False):
@@ -240,8 +240,6 @@ def display_evidence_sources(evidence_list, market=None):
         st.warning("⚠️ No evidence found for this query")
         return
     
-    st.markdown("**📚 Sources used for this answer:**")
-    
     # Count evidence by type
     type_counts = {}
     for ev in evidence_list:
@@ -253,7 +251,9 @@ def display_evidence_sources(evidence_list, market=None):
     # DEBUG: Show what we counted
     st.write(f"DEBUG: Found {len(type_counts)} different source types: {list(type_counts.keys())}")
     
-    # Display counts in columns
+    st.markdown("**📚 Sources used for this answer:**")
+    
+    # Display counts in a simple, visible way
     badge_map = {
         'interview_transcript': '🎤 Interview',
         'social_listening': '💬 Social',
@@ -262,15 +262,14 @@ def display_evidence_sources(evidence_list, market=None):
         'behavioral_data': '📊 Analytics'
     }
     
-    # Create columns for each source type found
-    if type_counts:
-        cols = st.columns(len(type_counts))
-        for idx, (source_type, count) in enumerate(type_counts.items()):
-            with cols[idx]:
-                badge = badge_map.get(source_type, f'📄 {source_type}')
-                st.metric(label=badge, value=count)
-    else:
-        st.error("No evidence types found!")
+    # Show as simple text with counts
+    count_text = " | ".join([
+        f"**{badge_map.get(source_type, source_type)}: {count}**" 
+        for source_type, count in type_counts.items()
+    ])
+    
+    st.markdown(count_text)
+    st.markdown("")
 
 # Load personas
 def load_personas():
