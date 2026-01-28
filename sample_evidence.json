@@ -1,0 +1,187 @@
+[
+  {
+    "market": "korea",
+    "source_type": "interview_transcript",
+    "content": "When I shop online, I always look for the 'Rocket Delivery' badge first. If I can't get it tomorrow, I usually just go to the store instead. Time is more valuable than saving a few thousand won.",
+    "metadata": {
+      "participant_age": 32,
+      "location": "Seoul",
+      "interview_date": "2024-01-15",
+      "shopping_frequency": "3-4 times per week"
+    }
+  },
+  {
+    "market": "korea",
+    "source_type": "social_listening",
+    "content": "Anyone else tired of sites forcing you to download their app? I just want to buy one thing, not have 20 shopping apps on my phone 📱",
+    "metadata": {
+      "platform": "Twitter",
+      "engagement": 456,
+      "sentiment": "frustrated",
+      "date": "2024-01-18"
+    }
+  },
+  {
+    "market": "korea",
+    "source_type": "search_query",
+    "content": "무신사 vs 에이블리 후기 (Musinsa vs Ably reviews)",
+    "metadata": {
+      "search_volume": 8900,
+      "region": "Nationwide",
+      "category": "fashion",
+      "trend": "increasing"
+    }
+  },
+  {
+    "market": "poland",
+    "source_type": "interview_transcript",
+    "content": "I always calculate the final price with shipping before I commit. Too many times I've added items to cart only to find out shipping costs more than the product. It's frustrating and feels like they're trying to trick you.",
+    "metadata": {
+      "participant_age": 29,
+      "location": "Krakow",
+      "occupation": "accountant",
+      "price_sensitivity": "high"
+    }
+  },
+  {
+    "market": "poland",
+    "source_type": "user_quote",
+    "content": "Returns are a nightmare in Poland. You have to print labels, go to the post office during work hours, keep all the packaging... I just avoid buying anything I'm not 100% sure about.",
+    "metadata": {
+      "source": "focus_group",
+      "age_range": "30-40",
+      "return_rate": "low"
+    }
+  },
+  {
+    "market": "poland",
+    "source_type": "social_listening",
+    "content": "Why does every Allegro seller have different shipping policies? One offers free shipping, another charges 20 PLN for the same item. Make it simple!",
+    "metadata": {
+      "platform": "Facebook Group: Polskie Zakupy Online",
+      "reactions": 234,
+      "comments": 56
+    }
+  },
+  {
+    "market": "turkey",
+    "source_type": "interview_transcript",
+    "content": "I check prices multiple times per day because they change so fast. Yesterday a jacket was 800 TL, this morning 950 TL. The exchange rate makes everything unstable. When I see a good price, I buy immediately.",
+    "metadata": {
+      "participant_age": 25,
+      "location": "Istanbul",
+      "income": "lower-middle",
+      "urgency": "high"
+    }
+  },
+  {
+    "market": "turkey",
+    "source_type": "search_query",
+    "content": "trendyol sahte ürün nasıl anlaşılır (how to identify fake products on trendyol)",
+    "metadata": {
+      "search_volume": 15600,
+      "concern": "product_authenticity",
+      "trend": "steady"
+    }
+  },
+  {
+    "market": "turkey",
+    "source_type": "user_quote",
+    "content": "Customer service is impossible to reach. I tried calling, emailing, even messaging on Instagram. After a week, they finally responded on Twitter. Why is Twitter faster than their official support?",
+    "metadata": {
+      "source": "survey",
+      "satisfaction": 2,
+      "issue": "customer_service"
+    }
+  },
+  {
+    "market": "global",
+    "source_type": "behavioral_data",
+    "content": "Users across all three markets show similar cart abandonment patterns: 68% abandon due to unexpected costs, 24% due to account creation requirements, 8% due to slow page load times.",
+    "metadata": {
+      "study": "Q1 2024 E-commerce Behavior Study",
+      "sample_size": 12000,
+      "markets": ["korea", "poland", "turkey"]
+    }
+  },
+  {
+    "market": "global",
+    "source_type": "behavioral_data",
+    "content": "Mobile shopping dominates evening hours (8 PM - 11 PM) with 78% of traffic. Desktop usage peaks during lunch breaks (12 PM - 2 PM) at 65%. Weekend patterns show more leisure browsing on mobile.",
+    "metadata": {
+      "data_source": "App Analytics",
+      "time_period": "Jan 2024",
+      "device_breakdown": true
+    }
+  },
+  {
+    "market": "korea",
+    "source_type": "user_quote",
+    "content": "I trust blogger reviews more than official product descriptions. Bloggers show real usage, real problems. Company descriptions are always perfect - no product is perfect.",
+    "metadata": {
+      "trust_ranking": "bloggers > friends > reviews > company",
+      "age": 27
+    }
+  },
+  {
+    "market": "poland",
+    "source_type": "search_query",
+    "content": "opinie o sklepie [shop name] (reviews about shop [shop name])",
+    "metadata": {
+      "search_volume": 22000,
+      "search_intent": "trust_verification",
+      "frequency": "before_purchase"
+    }
+  },
+  {
+    "market": "turkey",
+    "source_type": "social_listening",
+    "content": "Hepsiburada vs Trendyol - which has better customer service? Need to return something but scared it will take months like last time 😰",
+    "metadata": {
+      "platform": "Ekşi Sözlük",
+      "thread_replies": 89,
+      "sentiment": "anxious"
+    }
+  },
+  {
+    "market": "korea",
+    "source_type": "interview_transcript",
+    "content": "I use Naver Shopping to compare prices across all sites, then I go to the cheapest one. But honestly, if the difference is small I just buy from Coupang because I know it will arrive fast and returns are easy.",
+    "metadata": {
+      "participant_age": 35,
+      "decision_factors": ["price", "convenience", "trust"],
+      "primary_platform": "Coupang"
+    }
+  },
+  {
+    "market": "poland",
+    "source_type": "user_quote",
+    "content": "I never buy from new sellers with no reviews. Even if the price is better, it's not worth the risk. I've learned this the hard way.",
+    "metadata": {
+      "source": "online_community",
+      "trust_level": "low_for_new",
+      "bad_experience": true
+    }
+  },
+  {
+    "market": "turkey",
+    "source_type": "interview_transcript",
+    "content": "Size charts are useless. Every brand is different. I have to read reviews specifically about sizing - 'is it true to size?' 'should I order one size up?' This is the most important information.",
+    "metadata": {
+      "participant_age": 28,
+      "category": "fashion",
+      "main_concern": "fit",
+      "return_reason_if_wrong": "yes"
+    }
+  },
+  {
+    "market": "global",
+    "source_type": "user_quote",
+    "content": "Trust is built slowly but destroyed instantly. One bad delivery experience and I will never use that platform again, no matter how cheap their prices are.",
+    "metadata": {
+      "sentiment": "trust_critical",
+      "markets": "all",
+      "switching_behavior": "immediate"
+    }
+  }
+]

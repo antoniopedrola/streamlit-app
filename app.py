@@ -269,4 +269,3 @@ if st.session_state.selected_persona:
 
 st.markdown("---")
 st.caption("Powered by Claude + Supabase • Synthetic User Research")
-
