@@ -597,6 +597,7 @@ if st.session_state.selected_persona:
             question,
             answer,
             all_evidence
+        )
         
         st.rerun()
 
